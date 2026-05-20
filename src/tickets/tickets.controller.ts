@@ -21,6 +21,11 @@ export class TicketsController {
     return this.ticketsService.findAll(projectId ? +projectId : undefined);
   }
 
+  @Get('deleted')
+  findDeleted(@Query('projectId') projectId?: string) {
+    return this.ticketsService.findDeleted(projectId ? +projectId : undefined);
+  }
+
   @Get(':ticketId')
   findOne(@Param('ticketId') ticketId: string) {
     return this.ticketsService.findOne(+ticketId);
@@ -29,6 +34,11 @@ export class TicketsController {
   @Post()
   create(@Body() createTicketDto: CreateTicketDto) {
     return this.ticketsService.create(createTicketDto);
+  }
+
+  @Post(':ticketId/restore')
+  restore(@Param('ticketId') ticketId: string) {
+    return this.ticketsService.restore(+ticketId);
   }
 
   @Patch(':ticketId')

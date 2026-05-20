@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { IsNull, Not, Repository } from 'typeorm';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
 import { Ticket, TicketStatus } from './entities/ticket.entity';
@@ -26,6 +26,17 @@ export class TicketsService {
       where: {
         ...(projectId ? { projectId } : {}),
         deletedAt: IsNull(),
+      },
+      order: { id: 'ASC' },
+    });
+  }
+
+  findDeleted(projectId?: number) {
+    return this.ticketsRepository.find({
+      withDeleted: true,
+      where: {
+        ...(projectId ? { projectId } : {}),
+        deletedAt: Not(IsNull()),
       },
       order: { id: 'ASC' },
     });
@@ -70,6 +81,19 @@ export class TicketsService {
     await this.findOne(id);
 
     await this.ticketsRepository.softDelete(id);
+  }
+
+  async restore(id: number) {
+    const ticket = await this.ticketsRepository.findOne({
+      withDeleted: true,
+      where: { id },
+    });
+
+    if (!ticket) {
+      throw new NotFoundException(`Ticket with id ${id} was not found`);
+    }
+
+    await this.ticketsRepository.restore(id);
   }
 
   private validateStatusForwardOnly(

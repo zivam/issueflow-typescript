@@ -12,6 +12,11 @@ export class ProjectsController {
     return this.projectsService.findAll();
   }
 
+  @Get('deleted')
+  findDeleted() {
+    return this.projectsService.findDeleted();
+  }
+
   @Get(':projectId')
   findOne(@Param('projectId') projectId: string) {
     return this.projectsService.findOne(+projectId);
@@ -20,6 +25,11 @@ export class ProjectsController {
   @Post()
   create(@Body() createProjectDto: CreateProjectDto) {
     return this.projectsService.create(createProjectDto);
+  }
+
+  @Post(':projectId/restore')
+  restore(@Param('projectId') projectId: string) {
+    return this.projectsService.restore(+projectId);
   }
 
   @Patch(':projectId')

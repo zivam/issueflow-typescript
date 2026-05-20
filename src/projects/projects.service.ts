@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { IsNull, Not, Repository } from 'typeorm';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { Project } from './entities/project.entity';
@@ -20,6 +20,14 @@ export class ProjectsService {
   findAll() {
     return this.projectsRepository.find({
       where: { deletedAt: IsNull() },
+      order: { id: 'ASC' },
+    });
+  }
+
+  findDeleted() {
+    return this.projectsRepository.find({
+      withDeleted: true,
+      where: { deletedAt: Not(IsNull()) },
       order: { id: 'ASC' },
     });
   }
@@ -51,5 +59,18 @@ export class ProjectsService {
     await this.findOne(id);
 
     await this.projectsRepository.softDelete(id);
+  }
+
+  async restore(id: number) {
+    const project = await this.projectsRepository.findOne({
+      withDeleted: true,
+      where: { id },
+    });
+
+    if (!project) {
+      throw new NotFoundException(`Project with id ${id} was not found`);
+    }
+
+    await this.projectsRepository.restore(id);
   }
 }
