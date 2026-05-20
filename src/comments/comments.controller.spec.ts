@@ -5,10 +5,23 @@ import { CommentsService } from './comments.service';
 describe('CommentsController', () => {
   let controller: CommentsController;
 
+  const mockCommentsService = {
+    findAllByTicket: jest.fn(),
+    findOne: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    remove: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CommentsController],
-      providers: [CommentsService],
+      providers: [
+        {
+          provide: CommentsService,
+          useValue: mockCommentsService,
+        },
+      ],
     }).compile();
 
     controller = module.get<CommentsController>(CommentsController);
