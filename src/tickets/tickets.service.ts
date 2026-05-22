@@ -4,11 +4,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Not, Repository } from 'typeorm';
+import { In, IsNull, Not, Repository } from 'typeorm';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { AuditAction } from '../audit-logs/entities/audit-log.entity';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
+import { TicketDependency } from './entities/ticket-dependency.entity';
 import { Ticket, TicketStatus } from './entities/ticket.entity';
 
 @Injectable()
@@ -16,6 +17,10 @@ export class TicketsService {
   constructor(
     @InjectRepository(Ticket)
     private readonly ticketsRepository: Repository<Ticket>,
+
+    @InjectRepository(TicketDependency)
+    private readonly ticketDependenciesRepository: Repository<TicketDependency>,
+
     private readonly auditLogsService: AuditLogsService,
   ) {}
 
@@ -77,6 +82,10 @@ export class TicketsService {
 
     if (updateTicketDto.status) {
       this.validateStatusForwardOnly(ticket.status, updateTicketDto.status);
+
+      if (updateTicketDto.status === TicketStatus.DONE) {
+        await this.validateNoUnresolvedBlockers(id);
+      }
     }
 
     Object.assign(ticket, updateTicketDto);
@@ -123,6 +132,129 @@ export class TicketsService {
       entityType: 'TICKET',
       entityId: id,
     });
+  }
+
+  async addDependency(ticketId: number, blockedBy: number) {
+    if (ticketId === blockedBy) {
+      throw new BadRequestException('A ticket cannot depend on itself');
+    }
+
+    const ticket = await this.findOne(ticketId);
+    const blocker = await this.findOne(blockedBy);
+
+    if (ticket.projectId !== blocker.projectId) {
+      throw new BadRequestException(
+        'Both tickets must belong to the same project',
+      );
+    }
+
+    const existingDependency = await this.ticketDependenciesRepository.findOne({
+      where: {
+        ticketId,
+        blockedBy,
+      },
+    });
+
+    if (existingDependency) {
+      throw new BadRequestException('Dependency already exists');
+    }
+
+    const dependency = this.ticketDependenciesRepository.create({
+      ticketId,
+      blockedBy,
+    });
+
+    const savedDependency =
+      await this.ticketDependenciesRepository.save(dependency);
+
+    await this.auditLogsService.create({
+      action: AuditAction.CREATE,
+      entityType: 'TICKET_DEPENDENCY',
+      entityId: savedDependency.id,
+    });
+
+    return savedDependency;
+  }
+
+  async findDependencies(ticketId: number) {
+    await this.findOne(ticketId);
+
+    const dependencies = await this.ticketDependenciesRepository.find({
+      where: { ticketId },
+      order: { id: 'ASC' },
+    });
+
+    const blockerIds = dependencies.map((dependency) => dependency.blockedBy);
+
+    if (blockerIds.length === 0) {
+      return [];
+    }
+
+    const blockers = await this.ticketsRepository.find({
+      where: {
+        id: In(blockerIds),
+        deletedAt: IsNull(),
+      },
+      order: { id: 'ASC' },
+    });
+
+    return blockers.map((blocker) => ({
+      id: blocker.id,
+      title: blocker.title,
+      status: blocker.status,
+    }));
+  }
+
+  async removeDependency(ticketId: number, blockerId: number) {
+    await this.findOne(ticketId);
+    await this.findOne(blockerId);
+
+    const dependency = await this.ticketDependenciesRepository.findOne({
+      where: {
+        ticketId,
+        blockedBy: blockerId,
+      },
+    });
+
+    if (!dependency) {
+      throw new NotFoundException('Dependency was not found');
+    }
+
+    const dependencyId = dependency.id;
+
+    await this.ticketDependenciesRepository.remove(dependency);
+
+    await this.auditLogsService.create({
+      action: AuditAction.DELETE,
+      entityType: 'TICKET_DEPENDENCY',
+      entityId: dependencyId,
+    });
+  }
+
+  private async validateNoUnresolvedBlockers(ticketId: number) {
+    const dependencies = await this.ticketDependenciesRepository.find({
+      where: { ticketId },
+    });
+
+    const blockerIds = dependencies.map((dependency) => dependency.blockedBy);
+
+    if (blockerIds.length === 0) {
+      return;
+    }
+
+    const unresolvedBlockers = await this.ticketsRepository.find({
+      where: {
+        id: In(blockerIds),
+        deletedAt: IsNull(),
+        status: Not(TicketStatus.DONE),
+      },
+    });
+
+    if (unresolvedBlockers.length > 0) {
+      throw new BadRequestException(
+        'Ticket cannot be moved to DONE while it has unresolved blockers',
+      );
+    }
   }
 
   private validateStatusForwardOnly(

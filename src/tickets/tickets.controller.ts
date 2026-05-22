@@ -26,6 +26,11 @@ export class TicketsController {
     return this.ticketsService.findDeleted(projectId ? +projectId : undefined);
   }
 
+  @Get(':ticketId/dependencies')
+  findDependencies(@Param('ticketId') ticketId: string) {
+    return this.ticketsService.findDependencies(+ticketId);
+  }
+
   @Get(':ticketId')
   findOne(@Param('ticketId') ticketId: string) {
     return this.ticketsService.findOne(+ticketId);
@@ -41,12 +46,28 @@ export class TicketsController {
     return this.ticketsService.restore(+ticketId);
   }
 
+  @Post(':ticketId/dependencies')
+  addDependency(
+    @Param('ticketId') ticketId: string,
+    @Body('blockedBy') blockedBy: number,
+  ) {
+    return this.ticketsService.addDependency(+ticketId, +blockedBy);
+  }
+
   @Patch(':ticketId')
   update(
     @Param('ticketId') ticketId: string,
     @Body() updateTicketDto: UpdateTicketDto,
   ) {
     return this.ticketsService.update(+ticketId, updateTicketDto);
+  }
+
+  @Delete(':ticketId/dependencies/:blockerId')
+  removeDependency(
+    @Param('ticketId') ticketId: string,
+    @Param('blockerId') blockerId: string,
+  ) {
+    return this.ticketsService.removeDependency(+ticketId, +blockerId);
   }
 
   @Delete(':ticketId')
