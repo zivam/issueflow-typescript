@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Not, Repository } from 'typeorm';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { AuditAction } from '../audit-logs/entities/audit-log.entity';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { Project } from './entities/project.entity';
@@ -10,11 +12,20 @@ export class ProjectsService {
   constructor(
     @InjectRepository(Project)
     private readonly projectsRepository: Repository<Project>,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
-  create(createProjectDto: CreateProjectDto) {
+  async create(createProjectDto: CreateProjectDto) {
     const project = this.projectsRepository.create(createProjectDto);
-    return this.projectsRepository.save(project);
+    const savedProject = await this.projectsRepository.save(project);
+
+    await this.auditLogsService.create({
+      action: AuditAction.CREATE,
+      entityType: 'PROJECT',
+      entityId: savedProject.id,
+    });
+
+    return savedProject;
   }
 
   findAll() {
@@ -53,12 +64,24 @@ export class ProjectsService {
     Object.assign(project, updateProjectDto);
 
     await this.projectsRepository.save(project);
+
+    await this.auditLogsService.create({
+      action: AuditAction.UPDATE,
+      entityType: 'PROJECT',
+      entityId: id,
+    });
   }
 
   async remove(id: number) {
     await this.findOne(id);
 
     await this.projectsRepository.softDelete(id);
+
+    await this.auditLogsService.create({
+      action: AuditAction.DELETE,
+      entityType: 'PROJECT',
+      entityId: id,
+    });
   }
 
   async restore(id: number) {
@@ -72,5 +95,11 @@ export class ProjectsService {
     }
 
     await this.projectsRepository.restore(id);
+
+    await this.auditLogsService.create({
+      action: AuditAction.RESTORE,
+      entityType: 'PROJECT',
+      entityId: id,
+    });
   }
 }

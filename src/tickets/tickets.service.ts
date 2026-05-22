@@ -5,6 +5,8 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Not, Repository } from 'typeorm';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { AuditAction } from '../audit-logs/entities/audit-log.entity';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
 import { Ticket, TicketStatus } from './entities/ticket.entity';
@@ -14,11 +16,20 @@ export class TicketsService {
   constructor(
     @InjectRepository(Ticket)
     private readonly ticketsRepository: Repository<Ticket>,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
-  create(createTicketDto: CreateTicketDto) {
+  async create(createTicketDto: CreateTicketDto) {
     const ticket = this.ticketsRepository.create(createTicketDto);
-    return this.ticketsRepository.save(ticket);
+    const savedTicket = await this.ticketsRepository.save(ticket);
+
+    await this.auditLogsService.create({
+      action: AuditAction.CREATE,
+      entityType: 'TICKET',
+      entityId: savedTicket.id,
+    });
+
+    return savedTicket;
   }
 
   findAll(projectId?: number) {
@@ -75,12 +86,24 @@ export class TicketsService {
     }
 
     await this.ticketsRepository.save(ticket);
+
+    await this.auditLogsService.create({
+      action: AuditAction.UPDATE,
+      entityType: 'TICKET',
+      entityId: id,
+    });
   }
 
   async remove(id: number) {
     await this.findOne(id);
 
     await this.ticketsRepository.softDelete(id);
+
+    await this.auditLogsService.create({
+      action: AuditAction.DELETE,
+      entityType: 'TICKET',
+      entityId: id,
+    });
   }
 
   async restore(id: number) {
@@ -94,6 +117,12 @@ export class TicketsService {
     }
 
     await this.ticketsRepository.restore(id);
+
+    await this.auditLogsService.create({
+      action: AuditAction.RESTORE,
+      entityType: 'TICKET',
+      entityId: id,
+    });
   }
 
   private validateStatusForwardOnly(
