@@ -5,7 +5,7 @@
 The primary AI model used during this assignment was:
 
 ```text
-GPT-4.5 (OpenAI)
+GPT-5.5 Thinking
 ```
 
 An additional code review and automated fixes were performed using:
