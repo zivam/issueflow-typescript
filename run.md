@@ -272,3 +272,11 @@ Uploaded ticket attachments are stored under:
 ```text
 uploads/ticket-attachments
 ```
+
+### Token Revocation
+
+Revoked JWT tokens are stored in an in-memory `Set` inside the `AuthService`. This means revoked tokens are cleared when the server restarts. For production use, the deny-list should be persisted (e.g., in Redis or the database).
+
+### Auto-Escalation Schedule
+
+The auto-escalation job runs automatically every hour via a cron scheduler (`@nestjs/schedule`). It escalates the priority of non-DONE overdue tickets and sets the `isOverdue` flag on CRITICAL tickets. The job can also be triggered manually via `POST /tickets/auto-escalate`.

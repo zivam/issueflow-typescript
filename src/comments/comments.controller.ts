@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   Req,
+  Query,
 } from '@nestjs/common';
 import { RequestWithUser } from '../auth/request-with-user.interface';
 import { CommentsService } from './comments.service';
@@ -51,7 +52,15 @@ export class UserMentionsController {
   constructor(private readonly commentsService: CommentsService) {}
 
   @Get()
-  findMentionsForUser(@Param('userId') userId: string) {
-    return this.commentsService.findMentionsForUser(+userId);
+  findMentionsForUser(
+    @Param('userId') userId: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.commentsService.findMentionsForUser(
+      +userId,
+      page ? +page : undefined,
+      pageSize ? +pageSize : undefined,
+    );
   }
 }

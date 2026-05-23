@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -11,13 +12,14 @@ import { AuditLogsModule } from './audit-logs/audit-logs.module';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRoot({
       type: 'postgres',
-      host: 'localhost',
-      port: 5432,
-      username: 'issueflow',
-      password: 'issueflow',
-      database: 'issueflow',
+      host: process.env.DB_HOST ?? 'localhost',
+      port: parseInt(process.env.DB_PORT ?? '5432', 10),
+      username: process.env.DB_USERNAME ?? 'issueflow',
+      password: process.env.DB_PASSWORD ?? 'issueflow',
+      database: process.env.DB_DATABASE ?? 'issueflow',
       autoLoadEntities: true,
       synchronize: true,
     }),
