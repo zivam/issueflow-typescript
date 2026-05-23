@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -254,6 +255,8 @@ export class TicketsService {
   async update(id: number, updateTicketDto: UpdateTicketDto) {
     const ticket = await this.findOne(id);
 
+    this.validateVersion(ticket.version, updateTicketDto.version);
+
     if (ticket.status === TicketStatus.DONE) {
       throw new BadRequestException('A DONE ticket cannot be updated');
     }
@@ -266,7 +269,9 @@ export class TicketsService {
       }
     }
 
-    Object.assign(ticket, updateTicketDto);
+    const { version, ...ticketUpdates } = updateTicketDto;
+
+    Object.assign(ticket, ticketUpdates);
 
     if (updateTicketDto.priority) {
       ticket.isOverdue = false;
@@ -498,6 +503,18 @@ export class TicketsService {
     );
 
     return workload;
+  }
+
+  private validateVersion(currentVersion: number, requestVersion?: number) {
+    if (requestVersion === undefined) {
+      return;
+    }
+
+    if (requestVersion !== currentVersion) {
+      throw new ConflictException(
+        `Version conflict. Current version is ${currentVersion}`,
+      );
+    }
   }
 
   private async validateAttachmentFile(file: Express.Multer.File) {

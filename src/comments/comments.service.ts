@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
@@ -68,7 +72,11 @@ export class CommentsService {
   async update(id: number, updateCommentDto: UpdateCommentDto) {
     const comment = await this.findOne(id);
 
-    Object.assign(comment, updateCommentDto);
+    this.validateVersion(comment.version, updateCommentDto.version);
+
+    const { version, ...commentUpdates } = updateCommentDto;
+
+    Object.assign(comment, commentUpdates);
 
     const savedComment = await this.commentsRepository.save(comment);
 
@@ -120,6 +128,18 @@ export class CommentsService {
     return Promise.all(
       comments.map((comment) => this.attachMentionedUsers(comment)),
     );
+  }
+
+  private validateVersion(currentVersion: number, requestVersion?: number) {
+    if (requestVersion === undefined) {
+      return;
+    }
+
+    if (requestVersion !== currentVersion) {
+      throw new ConflictException(
+        `Version conflict. Current version is ${currentVersion}`,
+      );
+    }
   }
 
   private async syncMentions(commentId: number, content: string) {

@@ -6,10 +6,7 @@ import {
   IsOptional,
   IsString,
 } from 'class-validator';
-import {
-  TicketPriority,
-  TicketStatus,
-} from '../entities/ticket.entity';
+import { TicketPriority, TicketStatus } from '../entities/ticket.entity';
 
 export class UpdateTicketDto {
   @IsOptional()
@@ -37,4 +34,8 @@ export class UpdateTicketDto {
   @IsOptional()
   @IsDateString()
   dueDate?: Date;
+
+  @IsOptional()
+  @IsInt()
+  version?: number;
 }

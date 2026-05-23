@@ -5,6 +5,7 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
+  VersionColumn,
 } from 'typeorm';
 
 export enum TicketStatus {
@@ -69,6 +70,9 @@ export class Ticket {
 
   @Column({ default: false })
   isOverdue: boolean;
+
+  @VersionColumn({ default: 1 })
+  version: number;
 
   @CreateDateColumn()
   createdAt: Date;

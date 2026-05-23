@@ -4,6 +4,7 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
+  VersionColumn,
 } from 'typeorm';
 
 @Entity('comments')
@@ -19,6 +20,9 @@ export class Comment {
 
   @Column()
   content: string;
+
+  @VersionColumn({ default: 1 })
+  version: number;
 
   @CreateDateColumn()
   createdAt: Date;
