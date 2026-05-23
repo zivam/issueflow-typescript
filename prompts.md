@@ -290,16 +290,6 @@ Claude Code analyzed each source file against the requirements document and prod
 - Removed the unused `requireNumber` private method from `tickets.service.ts`.
 - Added notes to `run.md` about the token revocation limitation and auto-escalation schedule.
 
-### Review Prompts (Claude Code Session)
-
-```text
-@requirements.pdf תעבור על הקוד בריפו ותוודא שאני עומד בהם, במידה ולא תעשה רשימה של כל דבר שדורש תיקון
-```
-
-```text
-תתקן הכל, ואחרי זה תעדכן את הPROMPT.MD שהקוד עבר ביקורת של קלוד קוד
-```
-
 ## Accountability Statement
 
 AI was used as an assistant for planning, explanation, debugging, code review, and test guidance.
