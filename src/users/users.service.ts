@@ -57,6 +57,24 @@ export class UsersService {
     });
   }
 
+  async findByUsernames(usernames: string[]) {
+    const normalizedUsernames = [
+      ...new Set(usernames.map((username) => username.toLowerCase())),
+    ];
+
+    if (normalizedUsernames.length === 0) {
+      return [];
+    }
+
+    return this.usersRepository
+      .createQueryBuilder('user')
+      .where('LOWER(user.username) IN (:...usernames)', {
+        usernames: normalizedUsernames,
+      })
+      .orderBy('user.id', 'ASC')
+      .getMany();
+  }
+
   async update(id: number, updateUserDto: UpdateUserDto) {
     const user = await this.findOne(id);
 

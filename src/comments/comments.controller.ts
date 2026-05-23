@@ -33,3 +33,13 @@ export class CommentsController {
     return this.commentsService.remove(+commentId);
   }
 }
+
+@Controller('users/:userId/mentions')
+export class UserMentionsController {
+  constructor(private readonly commentsService: CommentsService) {}
+
+  @Get()
+  findMentionsForUser(@Param('userId') userId: string) {
+    return this.commentsService.findMentionsForUser(+userId);
+  }
+}
