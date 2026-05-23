@@ -11,10 +11,11 @@ import {
   UploadedFile,
   UseInterceptors,
   Req,
+  ForbiddenException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { existsSync, mkdirSync } from 'fs';
-import { diskStorage } from 'multer';
+import { diskStorage, memoryStorage } from 'multer';
 import { extname } from 'path';
 import { RequestWithUser } from '../auth/request-with-user.interface';
 import { TicketsService } from './tickets.service';
@@ -31,7 +32,12 @@ export class TicketsController {
   }
 
   @Get('deleted')
-  findDeleted(@Query('projectId') projectId?: string) {
+  findDeleted(
+    @Query('projectId') projectId: string | undefined,
+    @Req() req: RequestWithUser,
+  ) {
+    this.assertAdmin(req);
+
     return this.ticketsService.findDeleted(projectId ? +projectId : undefined);
   }
 
@@ -43,11 +49,20 @@ export class TicketsController {
   }
 
   @Post('import')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: {
+        fileSize: 10 * 1024 * 1024,
+      },
+    }),
+  )
   importCsv(
-    @Body('csvContent') csvContent: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Body('projectId') projectId: string,
     @Req() req: RequestWithUser,
   ) {
-    return this.ticketsService.importCsv(csvContent, req.user.id);
+    return this.ticketsService.importCsv(file, +projectId, req.user.id);
   }
 
   @Post('auto-escalate')
@@ -80,6 +95,8 @@ export class TicketsController {
 
   @Post(':ticketId/restore')
   restore(@Param('ticketId') ticketId: string, @Req() req: RequestWithUser) {
+    this.assertAdmin(req);
+
     return this.ticketsService.restore(+ticketId, req.user.id);
   }
 
@@ -167,5 +184,11 @@ export class TicketsController {
   @Delete(':ticketId')
   remove(@Param('ticketId') ticketId: string, @Req() req: RequestWithUser) {
     return this.ticketsService.remove(+ticketId, req.user.id);
+  }
+
+  private assertAdmin(req: RequestWithUser) {
+    if (req.user.role !== 'ADMIN') {
+      throw new ForbiddenException('Only ADMIN users can access this endpoint');
+    }
   }
 }

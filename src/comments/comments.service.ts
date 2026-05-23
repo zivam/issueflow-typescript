@@ -119,7 +119,7 @@ export class CommentsService {
 
     const mentions = await this.commentMentionsRepository.find({
       where: { userId },
-      order: { id: 'ASC' },
+      order: { id: 'DESC' },
     });
 
     const commentIds = mentions.map((mention) => mention.commentId);
@@ -130,11 +130,18 @@ export class CommentsService {
 
     const comments = await this.commentsRepository.find({
       where: { id: In(commentIds) },
-      order: { id: 'ASC' },
     });
 
+    const commentsById = new Map(
+      comments.map((comment) => [comment.id, comment]),
+    );
+
+    const orderedComments = commentIds
+      .map((commentId) => commentsById.get(commentId))
+      .filter((comment): comment is Comment => Boolean(comment));
+
     return Promise.all(
-      comments.map((comment) => this.attachMentionedUsers(comment)),
+      orderedComments.map((comment) => this.attachMentionedUsers(comment)),
     );
   }
 

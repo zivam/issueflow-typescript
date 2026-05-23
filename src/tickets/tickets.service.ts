@@ -108,34 +108,46 @@ export class TicketsService {
 
     return stringify(
       tickets.map((ticket) => ({
+        id: ticket.id,
         title: ticket.title,
         description: ticket.description,
         status: ticket.status,
         priority: ticket.priority,
         type: ticket.type,
-        projectId: ticket.projectId,
         assigneeId: ticket.assigneeId ?? '',
-        dueDate: ticket.dueDate ? new Date(ticket.dueDate).toISOString() : '',
       })),
       {
         header: true,
         columns: [
+          'id',
           'title',
           'description',
           'status',
           'priority',
           'type',
-          'projectId',
           'assigneeId',
-          'dueDate',
         ],
       },
     );
   }
 
-  async importCsv(csvContent: string, performedBy?: number) {
+  async importCsv(
+    file: Express.Multer.File,
+    projectId: number,
+    performedBy?: number,
+  ) {
+    if (!file) {
+      throw new BadRequestException('CSV file is required');
+    }
+
+    if (!Number.isInteger(projectId)) {
+      throw new BadRequestException('projectId is required');
+    }
+
+    const csvContent = file.buffer.toString('utf-8');
+
     if (!csvContent || csvContent.trim().length === 0) {
-      throw new BadRequestException('csvContent is required');
+      throw new BadRequestException('CSV file is empty');
     }
 
     let rows: Record<string, string>[];
@@ -161,7 +173,12 @@ export class TicketsService {
       const row = rows[index];
 
       try {
-        const createTicketDto = this.csvRowToCreateTicketDto(row, rowNumber);
+        const createTicketDto = this.csvRowToCreateTicketDto(
+          row,
+          rowNumber,
+          projectId,
+        );
+
         await this.create(createTicketDto, performedBy);
         created++;
       } catch (error) {
@@ -512,7 +529,7 @@ export class TicketsService {
 
     const workload = await Promise.all(
       developers.map(async (developer) => {
-        const openTickets = await this.ticketsRepository.count({
+        const openTicketCount = await this.ticketsRepository.count({
           where: {
             projectId,
             assigneeId: developer.id,
@@ -524,13 +541,18 @@ export class TicketsService {
         return {
           userId: developer.id,
           username: developer.username,
-          fullName: developer.fullName,
-          openTickets,
+          openTicketCount,
         };
       }),
     );
 
-    return workload;
+    return workload.sort((a, b) => {
+      if (a.openTicketCount !== b.openTicketCount) {
+        return a.openTicketCount - b.openTicketCount;
+      }
+
+      return a.userId - b.userId;
+    });
   }
 
   private validateVersion(currentVersion: number, requestVersion?: number) {
@@ -578,6 +600,7 @@ export class TicketsService {
   private csvRowToCreateTicketDto(
     row: Record<string, string>,
     rowNumber: number,
+    projectId: number,
   ): CreateTicketDto {
     const title = this.requireString(row.title, 'title', rowNumber);
     const description = this.requireString(
@@ -598,7 +621,6 @@ export class TicketsService {
       rowNumber,
     );
     const type = this.requireEnum(row.type, TicketType, 'type', rowNumber);
-    const projectId = this.requireNumber(row.projectId, 'projectId', rowNumber);
     const assigneeId = this.optionalNumber(
       row.assigneeId,
       'assigneeId',
@@ -694,18 +716,10 @@ export class TicketsService {
     const workload = await this.getProjectWorkload(projectId);
 
     if (workload.length === 0) {
-      throw new BadRequestException('No developers available for assignment');
+      return undefined;
     }
 
-    const sortedWorkload = workload.sort((a, b) => {
-      if (a.openTickets !== b.openTickets) {
-        return a.openTickets - b.openTickets;
-      }
-
-      return a.userId - b.userId;
-    });
-
-    return sortedWorkload[0].userId;
+    return workload[0].userId;
   }
 
   private async validateNoUnresolvedBlockers(ticketId: number) {

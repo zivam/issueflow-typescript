@@ -15,12 +15,30 @@ export class AuthController {
   }
 
   @Post('logout')
-  logout() {
-    return this.authService.logout();
+  logout(@Req() req: RequestWithUser) {
+    const token = this.extractTokenFromHeader(req);
+
+    return this.authService.logout(token);
   }
 
   @Get('me')
   me(@Req() req: RequestWithUser) {
     return this.authService.me(req.user);
+  }
+
+  private extractTokenFromHeader(req: RequestWithUser) {
+    const authorization = req.headers.authorization;
+
+    if (!authorization) {
+      return '';
+    }
+
+    const [type, token] = authorization.split(' ');
+
+    if (type !== 'Bearer' || !token) {
+      return '';
+    }
+
+    return token;
   }
 }

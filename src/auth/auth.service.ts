@@ -6,6 +6,8 @@ import { LoginDto } from './dto/login.dto';
 
 @Injectable()
 export class AuthService {
+  private readonly revokedTokens = new Set<string>();
+
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
@@ -40,8 +42,16 @@ export class AuthService {
     };
   }
 
-  logout() {
-    return;
+  logout(token: string) {
+    this.revokedTokens.add(token);
+
+    return {
+      message: 'Logged out successfully',
+    };
+  }
+
+  isTokenRevoked(token: string) {
+    return this.revokedTokens.has(token);
   }
 
   me(user: { id: number; username: string; role: string }) {

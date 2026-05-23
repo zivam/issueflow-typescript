@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Req,
+  ForbiddenException,
+} from '@nestjs/common';
+import { RequestWithUser } from '../auth/request-with-user.interface';
 import { TicketsService } from '../tickets/tickets.service';
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto } from './dto/create-project.dto';
@@ -17,7 +28,9 @@ export class ProjectsController {
   }
 
   @Get('deleted')
-  findDeleted() {
+  findDeleted(@Req() req: RequestWithUser) {
+    this.assertAdmin(req);
+
     return this.projectsService.findDeleted();
   }
 
@@ -37,7 +50,9 @@ export class ProjectsController {
   }
 
   @Post(':projectId/restore')
-  restore(@Param('projectId') projectId: string) {
+  restore(@Param('projectId') projectId: string, @Req() req: RequestWithUser) {
+    this.assertAdmin(req);
+
     return this.projectsService.restore(+projectId);
   }
 
@@ -52,5 +67,11 @@ export class ProjectsController {
   @Delete(':projectId')
   remove(@Param('projectId') projectId: string) {
     return this.projectsService.remove(+projectId);
+  }
+
+  private assertAdmin(req: RequestWithUser) {
+    if (req.user.role !== 'ADMIN') {
+      throw new ForbiddenException('Only ADMIN users can access this endpoint');
+    }
   }
 }
