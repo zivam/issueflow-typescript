@@ -4,6 +4,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { mkdir, unlink } from 'fs/promises';
+import { dirname } from 'path';
 import { parse } from 'csv-parse/sync';
 import { stringify } from 'csv-stringify/sync';
 import { In, IsNull, Not, Repository } from 'typeorm';
@@ -15,6 +17,7 @@ import {
 import { UsersService } from '../users/users.service';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
+import { TicketAttachment } from './entities/ticket-attachment.entity';
 import { TicketDependency } from './entities/ticket-dependency.entity';
 import {
   Ticket,
@@ -25,12 +28,24 @@ import {
 
 @Injectable()
 export class TicketsService {
+  private readonly maxAttachmentSize = 10 * 1024 * 1024;
+
+  private readonly allowedAttachmentMimeTypes = [
+    'image/png',
+    'image/jpeg',
+    'application/pdf',
+    'text/plain',
+  ];
+
   constructor(
     @InjectRepository(Ticket)
     private readonly ticketsRepository: Repository<Ticket>,
 
     @InjectRepository(TicketDependency)
     private readonly ticketDependenciesRepository: Repository<TicketDependency>,
+
+    @InjectRepository(TicketAttachment)
+    private readonly ticketAttachmentsRepository: Repository<TicketAttachment>,
 
     private readonly auditLogsService: AuditLogsService,
     private readonly usersService: UsersService,
@@ -335,6 +350,71 @@ export class TicketsService {
     });
   }
 
+  async addAttachment(ticketId: number, file: Express.Multer.File) {
+    await this.findOne(ticketId);
+    await this.validateAttachmentFile(file);
+
+    await mkdir(dirname(file.path), { recursive: true });
+
+    const attachment = this.ticketAttachmentsRepository.create({
+      ticketId,
+      originalName: file.originalname,
+      fileName: file.filename,
+      mimeType: file.mimetype,
+      size: file.size,
+      path: file.path,
+    });
+
+    const savedAttachment =
+      await this.ticketAttachmentsRepository.save(attachment);
+
+    await this.auditLogsService.create({
+      action: AuditAction.CREATE,
+      entityType: 'TICKET_ATTACHMENT',
+      entityId: savedAttachment.id,
+    });
+
+    return savedAttachment;
+  }
+
+  async findAttachments(ticketId: number) {
+    await this.findOne(ticketId);
+
+    return this.ticketAttachmentsRepository.find({
+      where: { ticketId },
+      order: { id: 'ASC' },
+    });
+  }
+
+  async removeAttachment(ticketId: number, attachmentId: number) {
+    await this.findOne(ticketId);
+
+    const attachment = await this.ticketAttachmentsRepository.findOne({
+      where: {
+        id: attachmentId,
+        ticketId,
+      },
+    });
+
+    if (!attachment) {
+      throw new NotFoundException('Attachment was not found');
+    }
+
+    await this.ticketAttachmentsRepository.remove(attachment);
+
+    try {
+      await unlink(attachment.path);
+    } catch {
+      return;
+    }
+
+    await this.auditLogsService.create({
+      action: AuditAction.DELETE,
+      entityType: 'TICKET_ATTACHMENT',
+      entityId: attachmentId,
+    });
+  }
+
   async getProjectWorkload(projectId: number) {
     const developers = await this.usersService.findDevelopers();
 
@@ -359,6 +439,36 @@ export class TicketsService {
     );
 
     return workload;
+  }
+
+  private async validateAttachmentFile(file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Attachment file is required');
+    }
+
+    if (file.size > this.maxAttachmentSize) {
+      await this.deleteUploadedFileIfExists(file);
+      throw new BadRequestException('Attachment size cannot exceed 10MB');
+    }
+
+    if (!this.allowedAttachmentMimeTypes.includes(file.mimetype)) {
+      await this.deleteUploadedFileIfExists(file);
+      throw new BadRequestException(
+        'Only png, jpeg, pdf and txt files are allowed',
+      );
+    }
+  }
+
+  private async deleteUploadedFileIfExists(file: Express.Multer.File) {
+    if (!file?.path) {
+      return;
+    }
+
+    try {
+      await unlink(file.path);
+    } catch {
+      return;
+    }
   }
 
   private csvRowToCreateTicketDto(

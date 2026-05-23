@@ -11,12 +11,15 @@ describe('TicketsController', () => {
     exportCsv: jest.fn(),
     importCsv: jest.fn(),
     findDependencies: jest.fn(),
+    findAttachments: jest.fn(),
     findOne: jest.fn(),
     create: jest.fn(),
     restore: jest.fn(),
     addDependency: jest.fn(),
+    addAttachment: jest.fn(),
     update: jest.fn(),
     removeDependency: jest.fn(),
+    removeAttachment: jest.fn(),
     remove: jest.fn(),
   };
 

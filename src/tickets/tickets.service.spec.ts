@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { UsersService } from '../users/users.service';
+import { TicketAttachment } from './entities/ticket-attachment.entity';
 import { TicketDependency } from './entities/ticket-dependency.entity';
 import { Ticket } from './entities/ticket.entity';
 import { TicketsService } from './tickets.service';
@@ -20,6 +21,14 @@ describe('TicketsService', () => {
   };
 
   const mockTicketDependenciesRepository = {
+    create: jest.fn(),
+    save: jest.fn(),
+    find: jest.fn(),
+    findOne: jest.fn(),
+    remove: jest.fn(),
+  };
+
+  const mockTicketAttachmentsRepository = {
     create: jest.fn(),
     save: jest.fn(),
     find: jest.fn(),
@@ -46,6 +55,10 @@ describe('TicketsService', () => {
         {
           provide: getRepositoryToken(TicketDependency),
           useValue: mockTicketDependenciesRepository,
+        },
+        {
+          provide: getRepositoryToken(TicketAttachment),
+          useValue: mockTicketAttachmentsRepository,
         },
         {
           provide: AuditLogsService,

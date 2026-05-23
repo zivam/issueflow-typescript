@@ -8,7 +8,13 @@ import {
   Delete,
   Query,
   Header,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { existsSync, mkdirSync } from 'fs';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
 import { TicketsService } from './tickets.service';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
@@ -44,6 +50,11 @@ export class TicketsController {
     return this.ticketsService.findDependencies(+ticketId);
   }
 
+  @Get(':ticketId/attachments')
+  findAttachments(@Param('ticketId') ticketId: string) {
+    return this.ticketsService.findAttachments(+ticketId);
+  }
+
   @Get(':ticketId')
   findOne(@Param('ticketId') ticketId: string) {
     return this.ticketsService.findOne(+ticketId);
@@ -67,6 +78,38 @@ export class TicketsController {
     return this.ticketsService.addDependency(+ticketId, +blockedBy);
   }
 
+  @Post(':ticketId/attachments')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (req, file, callback) => {
+          const uploadPath = './uploads/ticket-attachments';
+
+          if (!existsSync(uploadPath)) {
+            mkdirSync(uploadPath, { recursive: true });
+          }
+
+          callback(null, uploadPath);
+        },
+        filename: (req, file, callback) => {
+          const uniqueSuffix = `${Date.now()}-${Math.round(
+            Math.random() * 1e9,
+          )}`;
+          callback(null, `${uniqueSuffix}${extname(file.originalname)}`);
+        },
+      }),
+      limits: {
+        fileSize: 10 * 1024 * 1024,
+      },
+    }),
+  )
+  addAttachment(
+    @Param('ticketId') ticketId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.ticketsService.addAttachment(+ticketId, file);
+  }
+
   @Patch(':ticketId')
   update(
     @Param('ticketId') ticketId: string,
@@ -81,6 +124,14 @@ export class TicketsController {
     @Param('blockerId') blockerId: string,
   ) {
     return this.ticketsService.removeDependency(+ticketId, +blockerId);
+  }
+
+  @Delete(':ticketId/attachments/:attachmentId')
+  removeAttachment(
+    @Param('ticketId') ticketId: string,
+    @Param('attachmentId') attachmentId: string,
+  ) {
+    return this.ticketsService.removeAttachment(+ticketId, +attachmentId);
   }
 
   @Delete(':ticketId')
