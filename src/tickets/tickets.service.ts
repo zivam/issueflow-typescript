@@ -6,7 +6,11 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Not, Repository } from 'typeorm';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
-import { AuditAction } from '../audit-logs/entities/audit-log.entity';
+import {
+  AuditAction,
+  AuditActor,
+} from '../audit-logs/entities/audit-log.entity';
+import { UsersService } from '../users/users.service';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
 import { TicketDependency } from './entities/ticket-dependency.entity';
@@ -22,10 +26,17 @@ export class TicketsService {
     private readonly ticketDependenciesRepository: Repository<TicketDependency>,
 
     private readonly auditLogsService: AuditLogsService,
+    private readonly usersService: UsersService,
   ) {}
 
   async create(createTicketDto: CreateTicketDto) {
-    const ticket = this.ticketsRepository.create(createTicketDto);
+    const ticketData = { ...createTicketDto };
+
+    if (!ticketData.assigneeId) {
+      ticketData.assigneeId = await this.findAutoAssignee(ticketData.projectId);
+    }
+
+    const ticket = this.ticketsRepository.create(ticketData);
     const savedTicket = await this.ticketsRepository.save(ticket);
 
     await this.auditLogsService.create({
@@ -33,6 +44,16 @@ export class TicketsService {
       entityType: 'TICKET',
       entityId: savedTicket.id,
     });
+
+    if (!createTicketDto.assigneeId && savedTicket.assigneeId) {
+      await this.auditLogsService.create({
+        action: AuditAction.AUTO_ASSIGN,
+        entityType: 'TICKET',
+        entityId: savedTicket.id,
+        performedBy: savedTicket.assigneeId,
+        actor: AuditActor.SYSTEM,
+      });
+    }
 
     return savedTicket;
   }
@@ -229,6 +250,50 @@ export class TicketsService {
       entityType: 'TICKET_DEPENDENCY',
       entityId: dependencyId,
     });
+  }
+
+  async getProjectWorkload(projectId: number) {
+    const developers = await this.usersService.findDevelopers();
+
+    const workload = await Promise.all(
+      developers.map(async (developer) => {
+        const openTickets = await this.ticketsRepository.count({
+          where: {
+            projectId,
+            assigneeId: developer.id,
+            deletedAt: IsNull(),
+            status: Not(TicketStatus.DONE),
+          },
+        });
+
+        return {
+          userId: developer.id,
+          username: developer.username,
+          fullName: developer.fullName,
+          openTickets,
+        };
+      }),
+    );
+
+    return workload;
+  }
+
+  private async findAutoAssignee(projectId: number) {
+    const workload = await this.getProjectWorkload(projectId);
+
+    if (workload.length === 0) {
+      throw new BadRequestException('No developers available for assignment');
+    }
+
+    const sortedWorkload = workload.sort((a, b) => {
+      if (a.openTickets !== b.openTickets) {
+        return a.openTickets - b.openTickets;
+      }
+
+      return a.userId - b.userId;
+    });
+
+    return sortedWorkload[0].userId;
   }
 
   private async validateNoUnresolvedBlockers(ticketId: number) {

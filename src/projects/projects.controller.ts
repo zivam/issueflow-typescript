@@ -1,11 +1,15 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { TicketsService } from '../tickets/tickets.service';
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 
 @Controller('projects')
 export class ProjectsController {
-  constructor(private readonly projectsService: ProjectsService) {}
+  constructor(
+    private readonly projectsService: ProjectsService,
+    private readonly ticketsService: TicketsService,
+  ) {}
 
   @Get()
   findAll() {
@@ -15,6 +19,11 @@ export class ProjectsController {
   @Get('deleted')
   findDeleted() {
     return this.projectsService.findDeleted();
+  }
+
+  @Get(':projectId/workload')
+  getWorkload(@Param('projectId') projectId: string) {
+    return this.ticketsService.getProjectWorkload(+projectId);
   }
 
   @Get(':projectId')

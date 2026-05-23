@@ -4,7 +4,7 @@ import * as bcrypt from 'bcrypt';
 import { Repository } from 'typeorm';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { User } from './entities/user.entity';
+import { User, UserRole } from './entities/user.entity';
 
 @Injectable()
 export class UsersService {
@@ -28,6 +28,13 @@ export class UsersService {
 
   findAll() {
     return this.usersRepository.find({
+      order: { id: 'ASC' },
+    });
+  }
+
+  findDevelopers() {
+    return this.usersRepository.find({
+      where: { role: UserRole.DEVELOPER },
       order: { id: 'ASC' },
     });
   }

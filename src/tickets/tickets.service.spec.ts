@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { UsersService } from '../users/users.service';
 import { TicketDependency } from './entities/ticket-dependency.entity';
 import { Ticket } from './entities/ticket.entity';
 import { TicketsService } from './tickets.service';
@@ -15,6 +16,7 @@ describe('TicketsService', () => {
     findOne: jest.fn(),
     softDelete: jest.fn(),
     restore: jest.fn(),
+    count: jest.fn(),
   };
 
   const mockTicketDependenciesRepository = {
@@ -27,6 +29,10 @@ describe('TicketsService', () => {
 
   const mockAuditLogsService = {
     create: jest.fn(),
+  };
+
+  const mockUsersService = {
+    findDevelopers: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -44,6 +50,10 @@ describe('TicketsService', () => {
         {
           provide: AuditLogsService,
           useValue: mockAuditLogsService,
+        },
+        {
+          provide: UsersService,
+          useValue: mockUsersService,
         },
       ],
     }).compile();
