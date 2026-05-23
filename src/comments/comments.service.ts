@@ -26,7 +26,11 @@ export class CommentsService {
     private readonly auditLogsService: AuditLogsService,
   ) {}
 
-  async create(ticketId: number, createCommentDto: CreateCommentDto) {
+  async create(
+    ticketId: number,
+    createCommentDto: CreateCommentDto,
+    performedBy?: number,
+  ) {
     const comment = this.commentsRepository.create({
       ...createCommentDto,
       ticketId,
@@ -40,7 +44,7 @@ export class CommentsService {
       action: AuditAction.CREATE,
       entityType: 'COMMENT',
       entityId: savedComment.id,
-      performedBy: savedComment.authorId,
+      performedBy: performedBy ?? savedComment.authorId,
     });
 
     return this.attachMentionedUsers(savedComment);
@@ -69,7 +73,11 @@ export class CommentsService {
     return comment;
   }
 
-  async update(id: number, updateCommentDto: UpdateCommentDto) {
+  async update(
+    id: number,
+    updateCommentDto: UpdateCommentDto,
+    performedBy?: number,
+  ) {
     const comment = await this.findOne(id);
 
     this.validateVersion(comment.version, updateCommentDto.version);
@@ -86,13 +94,13 @@ export class CommentsService {
       action: AuditAction.UPDATE,
       entityType: 'COMMENT',
       entityId: savedComment.id,
-      performedBy: savedComment.authorId,
+      performedBy: performedBy ?? savedComment.authorId,
     });
 
     return this.attachMentionedUsers(savedComment);
   }
 
-  async remove(id: number) {
+  async remove(id: number, performedBy?: number) {
     const comment = await this.findOne(id);
 
     await this.commentMentionsRepository.delete({ commentId: id });
@@ -102,7 +110,7 @@ export class CommentsService {
       action: AuditAction.DELETE,
       entityType: 'COMMENT',
       entityId: id,
-      performedBy: comment.authorId,
+      performedBy: performedBy ?? comment.authorId,
     });
   }
 

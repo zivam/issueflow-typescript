@@ -52,7 +52,7 @@ export class TicketsService {
     private readonly usersService: UsersService,
   ) {}
 
-  async create(createTicketDto: CreateTicketDto) {
+  async create(createTicketDto: CreateTicketDto, performedBy?: number) {
     const ticketData = { ...createTicketDto };
 
     if (!ticketData.assigneeId) {
@@ -66,6 +66,7 @@ export class TicketsService {
       action: AuditAction.CREATE,
       entityType: 'TICKET',
       entityId: savedTicket.id,
+      performedBy,
     });
 
     if (!createTicketDto.assigneeId && savedTicket.assigneeId) {
@@ -132,7 +133,7 @@ export class TicketsService {
     );
   }
 
-  async importCsv(csvContent: string) {
+  async importCsv(csvContent: string, performedBy?: number) {
     if (!csvContent || csvContent.trim().length === 0) {
       throw new BadRequestException('csvContent is required');
     }
@@ -161,7 +162,7 @@ export class TicketsService {
 
       try {
         const createTicketDto = this.csvRowToCreateTicketDto(row, rowNumber);
-        await this.create(createTicketDto);
+        await this.create(createTicketDto, performedBy);
         created++;
       } catch (error) {
         const message =
@@ -252,7 +253,11 @@ export class TicketsService {
     return ticket;
   }
 
-  async update(id: number, updateTicketDto: UpdateTicketDto) {
+  async update(
+    id: number,
+    updateTicketDto: UpdateTicketDto,
+    performedBy?: number,
+  ) {
     const ticket = await this.findOne(id);
 
     this.validateVersion(ticket.version, updateTicketDto.version);
@@ -283,10 +288,11 @@ export class TicketsService {
       action: AuditAction.UPDATE,
       entityType: 'TICKET',
       entityId: id,
+      performedBy,
     });
   }
 
-  async remove(id: number) {
+  async remove(id: number, performedBy?: number) {
     await this.findOne(id);
 
     await this.ticketsRepository.softDelete(id);
@@ -295,10 +301,11 @@ export class TicketsService {
       action: AuditAction.DELETE,
       entityType: 'TICKET',
       entityId: id,
+      performedBy,
     });
   }
 
-  async restore(id: number) {
+  async restore(id: number, performedBy?: number) {
     const ticket = await this.ticketsRepository.findOne({
       withDeleted: true,
       where: { id },
@@ -314,10 +321,15 @@ export class TicketsService {
       action: AuditAction.RESTORE,
       entityType: 'TICKET',
       entityId: id,
+      performedBy,
     });
   }
 
-  async addDependency(ticketId: number, blockedBy: number) {
+  async addDependency(
+    ticketId: number,
+    blockedBy: number,
+    performedBy?: number,
+  ) {
     if (ticketId === blockedBy) {
       throw new BadRequestException('A ticket cannot depend on itself');
     }
@@ -354,6 +366,7 @@ export class TicketsService {
       action: AuditAction.CREATE,
       entityType: 'TICKET_DEPENDENCY',
       entityId: savedDependency.id,
+      performedBy,
     });
 
     return savedDependency;
@@ -388,7 +401,11 @@ export class TicketsService {
     }));
   }
 
-  async removeDependency(ticketId: number, blockerId: number) {
+  async removeDependency(
+    ticketId: number,
+    blockerId: number,
+    performedBy?: number,
+  ) {
     await this.findOne(ticketId);
     await this.findOne(blockerId);
 
@@ -411,10 +428,15 @@ export class TicketsService {
       action: AuditAction.DELETE,
       entityType: 'TICKET_DEPENDENCY',
       entityId: dependencyId,
+      performedBy,
     });
   }
 
-  async addAttachment(ticketId: number, file: Express.Multer.File) {
+  async addAttachment(
+    ticketId: number,
+    file: Express.Multer.File,
+    performedBy?: number,
+  ) {
     await this.findOne(ticketId);
     await this.validateAttachmentFile(file);
 
@@ -436,6 +458,7 @@ export class TicketsService {
       action: AuditAction.CREATE,
       entityType: 'TICKET_ATTACHMENT',
       entityId: savedAttachment.id,
+      performedBy,
     });
 
     return savedAttachment;
@@ -450,7 +473,11 @@ export class TicketsService {
     });
   }
 
-  async removeAttachment(ticketId: number, attachmentId: number) {
+  async removeAttachment(
+    ticketId: number,
+    attachmentId: number,
+    performedBy?: number,
+  ) {
     await this.findOne(ticketId);
 
     const attachment = await this.ticketAttachmentsRepository.findOne({
@@ -476,6 +503,7 @@ export class TicketsService {
       action: AuditAction.DELETE,
       entityType: 'TICKET_ATTACHMENT',
       entityId: attachmentId,
+      performedBy,
     });
   }
 

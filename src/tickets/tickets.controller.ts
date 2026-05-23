@@ -10,11 +10,13 @@ import {
   Header,
   UploadedFile,
   UseInterceptors,
+  Req,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { existsSync, mkdirSync } from 'fs';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
+import { RequestWithUser } from '../auth/request-with-user.interface';
 import { TicketsService } from './tickets.service';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
@@ -41,8 +43,11 @@ export class TicketsController {
   }
 
   @Post('import')
-  importCsv(@Body('csvContent') csvContent: string) {
-    return this.ticketsService.importCsv(csvContent);
+  importCsv(
+    @Body('csvContent') csvContent: string,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.ticketsService.importCsv(csvContent, req.user.id);
   }
 
   @Post('auto-escalate')
@@ -66,21 +71,29 @@ export class TicketsController {
   }
 
   @Post()
-  create(@Body() createTicketDto: CreateTicketDto) {
-    return this.ticketsService.create(createTicketDto);
+  create(
+    @Body() createTicketDto: CreateTicketDto,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.ticketsService.create(createTicketDto, req.user.id);
   }
 
   @Post(':ticketId/restore')
-  restore(@Param('ticketId') ticketId: string) {
-    return this.ticketsService.restore(+ticketId);
+  restore(@Param('ticketId') ticketId: string, @Req() req: RequestWithUser) {
+    return this.ticketsService.restore(+ticketId, req.user.id);
   }
 
   @Post(':ticketId/dependencies')
   addDependency(
     @Param('ticketId') ticketId: string,
     @Body('blockedBy') blockedBy: number,
+    @Req() req: RequestWithUser,
   ) {
-    return this.ticketsService.addDependency(+ticketId, +blockedBy);
+    return this.ticketsService.addDependency(
+      +ticketId,
+      +blockedBy,
+      req.user.id,
+    );
   }
 
   @Post(':ticketId/attachments')
@@ -111,36 +124,48 @@ export class TicketsController {
   addAttachment(
     @Param('ticketId') ticketId: string,
     @UploadedFile() file: Express.Multer.File,
+    @Req() req: RequestWithUser,
   ) {
-    return this.ticketsService.addAttachment(+ticketId, file);
+    return this.ticketsService.addAttachment(+ticketId, file, req.user.id);
   }
 
   @Patch(':ticketId')
   update(
     @Param('ticketId') ticketId: string,
     @Body() updateTicketDto: UpdateTicketDto,
+    @Req() req: RequestWithUser,
   ) {
-    return this.ticketsService.update(+ticketId, updateTicketDto);
+    return this.ticketsService.update(+ticketId, updateTicketDto, req.user.id);
   }
 
   @Delete(':ticketId/dependencies/:blockerId')
   removeDependency(
     @Param('ticketId') ticketId: string,
     @Param('blockerId') blockerId: string,
+    @Req() req: RequestWithUser,
   ) {
-    return this.ticketsService.removeDependency(+ticketId, +blockerId);
+    return this.ticketsService.removeDependency(
+      +ticketId,
+      +blockerId,
+      req.user.id,
+    );
   }
 
   @Delete(':ticketId/attachments/:attachmentId')
   removeAttachment(
     @Param('ticketId') ticketId: string,
     @Param('attachmentId') attachmentId: string,
+    @Req() req: RequestWithUser,
   ) {
-    return this.ticketsService.removeAttachment(+ticketId, +attachmentId);
+    return this.ticketsService.removeAttachment(
+      +ticketId,
+      +attachmentId,
+      req.user.id,
+    );
   }
 
   @Delete(':ticketId')
-  remove(@Param('ticketId') ticketId: string) {
-    return this.ticketsService.remove(+ticketId);
+  remove(@Param('ticketId') ticketId: string, @Req() req: RequestWithUser) {
+    return this.ticketsService.remove(+ticketId, req.user.id);
   }
 }

@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Req,
+} from '@nestjs/common';
+import { RequestWithUser } from '../auth/request-with-user.interface';
 import { CommentsService } from './comments.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
@@ -16,21 +26,23 @@ export class CommentsController {
   create(
     @Param('ticketId') ticketId: string,
     @Body() createCommentDto: CreateCommentDto,
+    @Req() req: RequestWithUser,
   ) {
-    return this.commentsService.create(+ticketId, createCommentDto);
+    return this.commentsService.create(+ticketId, createCommentDto, req.user.id);
   }
 
   @Patch(':commentId')
   update(
     @Param('commentId') commentId: string,
     @Body() updateCommentDto: UpdateCommentDto,
+    @Req() req: RequestWithUser,
   ) {
-    return this.commentsService.update(+commentId, updateCommentDto);
+    return this.commentsService.update(+commentId, updateCommentDto, req.user.id);
   }
 
   @Delete(':commentId')
-  remove(@Param('commentId') commentId: string) {
-    return this.commentsService.remove(+commentId);
+  remove(@Param('commentId') commentId: string, @Req() req: RequestWithUser) {
+    return this.commentsService.remove(+commentId, req.user.id);
   }
 }
 
