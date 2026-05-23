@@ -8,7 +8,7 @@ import { mkdir, unlink } from 'fs/promises';
 import { dirname } from 'path';
 import { parse } from 'csv-parse/sync';
 import { stringify } from 'csv-stringify/sync';
-import { In, IsNull, Not, Repository } from 'typeorm';
+import { In, IsNull, LessThan, Not, Repository } from 'typeorm';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import {
   AuditAction,
@@ -174,6 +174,65 @@ export class TicketsService {
       created,
       failed: errors.length,
       errors,
+    };
+  }
+
+  async autoEscalateOverdueTickets() {
+    const overdueTickets = await this.ticketsRepository.find({
+      where: {
+        deletedAt: IsNull(),
+        dueDate: LessThan(new Date()),
+        status: Not(TicketStatus.DONE),
+      },
+      order: { id: 'ASC' },
+    });
+
+    const escalatedTickets = [];
+
+    for (const ticket of overdueTickets) {
+      const previousPriority = ticket.priority;
+      const previousIsOverdue = ticket.isOverdue;
+
+      if (ticket.priority === TicketPriority.LOW) {
+        ticket.priority = TicketPriority.MEDIUM;
+      } else if (ticket.priority === TicketPriority.MEDIUM) {
+        ticket.priority = TicketPriority.HIGH;
+      } else if (ticket.priority === TicketPriority.HIGH) {
+        ticket.priority = TicketPriority.CRITICAL;
+      } else if (ticket.priority === TicketPriority.CRITICAL) {
+        ticket.isOverdue = true;
+      }
+
+      const changed =
+        previousPriority !== ticket.priority ||
+        previousIsOverdue !== ticket.isOverdue;
+
+      if (!changed) {
+        continue;
+      }
+
+      const savedTicket = await this.ticketsRepository.save(ticket);
+
+      await this.auditLogsService.create({
+        action: AuditAction.AUTO_ESCALATE,
+        entityType: 'TICKET',
+        entityId: savedTicket.id,
+        actor: AuditActor.SYSTEM,
+      });
+
+      escalatedTickets.push({
+        id: savedTicket.id,
+        previousPriority,
+        newPriority: savedTicket.priority,
+        previousIsOverdue,
+        newIsOverdue: savedTicket.isOverdue,
+      });
+    }
+
+    return {
+      checked: overdueTickets.length,
+      escalated: escalatedTickets.length,
+      tickets: escalatedTickets,
     };
   }
 
@@ -405,7 +464,7 @@ export class TicketsService {
     try {
       await unlink(attachment.path);
     } catch {
-      return;
+      // File may already be missing. The database record is still removed.
     }
 
     await this.auditLogsService.create({
@@ -467,7 +526,7 @@ export class TicketsService {
     try {
       await unlink(file.path);
     } catch {
-      return;
+      // File may already be missing.
     }
   }
 

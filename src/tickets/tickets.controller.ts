@@ -45,6 +45,11 @@ export class TicketsController {
     return this.ticketsService.importCsv(csvContent);
   }
 
+  @Post('auto-escalate')
+  autoEscalateOverdueTickets() {
+    return this.ticketsService.autoEscalateOverdueTickets();
+  }
+
   @Get(':ticketId/dependencies')
   findDependencies(@Param('ticketId') ticketId: string) {
     return this.ticketsService.findDependencies(+ticketId);

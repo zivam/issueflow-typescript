@@ -10,6 +10,7 @@ describe('TicketsController', () => {
     findDeleted: jest.fn(),
     exportCsv: jest.fn(),
     importCsv: jest.fn(),
+    autoEscalateOverdueTickets: jest.fn(),
     findDependencies: jest.fn(),
     findAttachments: jest.fn(),
     findOne: jest.fn(),
