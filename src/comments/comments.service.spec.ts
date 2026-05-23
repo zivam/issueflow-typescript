@@ -23,6 +23,7 @@ describe('CommentsService', () => {
     create: jest.fn(),
     save: jest.fn(),
     find: jest.fn(),
+    findAndCount: jest.fn(),
     delete: jest.fn(),
   };
 
@@ -257,8 +258,8 @@ describe('CommentsService', () => {
         fullName: 'Safe User',
       });
 
-    mockCommentMentionsRepository.find
-      .mockResolvedValueOnce([
+    mockCommentMentionsRepository.findAndCount.mockResolvedValueOnce([
+      [
         {
           id: 3,
           commentId: 30,
@@ -269,14 +270,17 @@ describe('CommentsService', () => {
           commentId: 20,
           userId: 4,
         },
-      ])
-      .mockResolvedValue([
-        {
-          id: 3,
-          commentId: 30,
-          userId: 4,
-        },
-      ]);
+      ],
+      2,
+    ]);
+
+    mockCommentMentionsRepository.find.mockResolvedValue([
+      {
+        id: 3,
+        commentId: 30,
+        userId: 4,
+      },
+    ]);
 
     mockCommentsRepository.find.mockResolvedValue([
       {
@@ -293,12 +297,14 @@ describe('CommentsService', () => {
 
     const result = await service.findMentionsForUser(4);
 
-    expect(mockCommentMentionsRepository.find).toHaveBeenCalledWith({
+    expect(mockCommentMentionsRepository.findAndCount).toHaveBeenCalledWith({
       where: { userId: 4 },
       order: { id: 'DESC' },
+      skip: 0,
+      take: 20,
     });
 
-    expect(result.map((comment) => comment.id)).toEqual([30, 20]);
+    expect(result.data.map((comment) => comment.id)).toEqual([30, 20]);
   });
 
   it('deletes a comment, clears mentions, and creates audit log', async () => {

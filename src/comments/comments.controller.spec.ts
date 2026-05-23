@@ -97,6 +97,6 @@ describe('CommentsController', () => {
   it('finds mentions for user id', () => {
     userMentionsController.findMentionsForUser('4');
 
-    expect(mockCommentsService.findMentionsForUser).toHaveBeenCalledWith(4);
+    expect(mockCommentsService.findMentionsForUser).toHaveBeenCalledWith(4, undefined, undefined);
   });
 });
