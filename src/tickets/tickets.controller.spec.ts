@@ -7,9 +7,16 @@ describe('TicketsController', () => {
 
   const mockTicketsService = {
     findAll: jest.fn(),
+    findDeleted: jest.fn(),
+    exportCsv: jest.fn(),
+    importCsv: jest.fn(),
+    findDependencies: jest.fn(),
     findOne: jest.fn(),
     create: jest.fn(),
+    restore: jest.fn(),
+    addDependency: jest.fn(),
     update: jest.fn(),
+    removeDependency: jest.fn(),
     remove: jest.fn(),
   };
 

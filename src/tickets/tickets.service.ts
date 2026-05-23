@@ -4,6 +4,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { parse } from 'csv-parse/sync';
+import { stringify } from 'csv-stringify/sync';
 import { In, IsNull, Not, Repository } from 'typeorm';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import {
@@ -14,7 +16,12 @@ import { UsersService } from '../users/users.service';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
 import { TicketDependency } from './entities/ticket-dependency.entity';
-import { Ticket, TicketStatus } from './entities/ticket.entity';
+import {
+  Ticket,
+  TicketPriority,
+  TicketStatus,
+  TicketType,
+} from './entities/ticket.entity';
 
 @Injectable()
 export class TicketsService {
@@ -77,6 +84,82 @@ export class TicketsService {
       },
       order: { id: 'ASC' },
     });
+  }
+
+  async exportCsv(projectId?: number) {
+    const tickets = await this.findAll(projectId);
+
+    return stringify(
+      tickets.map((ticket) => ({
+        title: ticket.title,
+        description: ticket.description,
+        status: ticket.status,
+        priority: ticket.priority,
+        type: ticket.type,
+        projectId: ticket.projectId,
+        assigneeId: ticket.assigneeId ?? '',
+        dueDate: ticket.dueDate ? new Date(ticket.dueDate).toISOString() : '',
+      })),
+      {
+        header: true,
+        columns: [
+          'title',
+          'description',
+          'status',
+          'priority',
+          'type',
+          'projectId',
+          'assigneeId',
+          'dueDate',
+        ],
+      },
+    );
+  }
+
+  async importCsv(csvContent: string) {
+    if (!csvContent || csvContent.trim().length === 0) {
+      throw new BadRequestException('csvContent is required');
+    }
+
+    let rows: Record<string, string>[];
+
+    try {
+      rows = parse(csvContent, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
+      }) as Record<string, string>[];
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Invalid CSV content';
+
+      throw new BadRequestException(`Invalid CSV content: ${message}`);
+    }
+
+    const errors: string[] = [];
+    let created = 0;
+
+    for (let index = 0; index < rows.length; index++) {
+      const rowNumber = index + 2;
+      const row = rows[index];
+
+      try {
+        const createTicketDto = this.csvRowToCreateTicketDto(row, rowNumber);
+        await this.create(createTicketDto);
+        created++;
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Unknown import error';
+
+        errors.push(`Row ${rowNumber}: ${message}`);
+      }
+    }
+
+    return {
+      created,
+      failed: errors.length,
+      errors,
+    };
   }
 
   async findOne(id: number) {
@@ -276,6 +359,121 @@ export class TicketsService {
     );
 
     return workload;
+  }
+
+  private csvRowToCreateTicketDto(
+    row: Record<string, string>,
+    rowNumber: number,
+  ): CreateTicketDto {
+    const title = this.requireString(row.title, 'title', rowNumber);
+    const description = this.requireString(
+      row.description,
+      'description',
+      rowNumber,
+    );
+    const status = this.requireEnum(
+      row.status,
+      TicketStatus,
+      'status',
+      rowNumber,
+    );
+    const priority = this.requireEnum(
+      row.priority,
+      TicketPriority,
+      'priority',
+      rowNumber,
+    );
+    const type = this.requireEnum(row.type, TicketType, 'type', rowNumber);
+    const projectId = this.requireNumber(row.projectId, 'projectId', rowNumber);
+    const assigneeId = this.optionalNumber(
+      row.assigneeId,
+      'assigneeId',
+      rowNumber,
+    );
+    const dueDate = this.optionalDate(row.dueDate, 'dueDate', rowNumber);
+
+    return {
+      title,
+      description,
+      status,
+      priority,
+      type,
+      projectId,
+      ...(assigneeId ? { assigneeId } : {}),
+      ...(dueDate ? { dueDate } : {}),
+    };
+  }
+
+  private requireString(value: string | undefined, field: string, row: number) {
+    if (!value || value.trim().length === 0) {
+      throw new BadRequestException(`Row ${row}: ${field} is required`);
+    }
+
+    return value.trim();
+  }
+
+  private requireNumber(value: string | undefined, field: string, row: number) {
+    if (!value || value.trim().length === 0) {
+      throw new BadRequestException(`Row ${row}: ${field} is required`);
+    }
+
+    const parsedValue = Number(value);
+
+    if (!Number.isInteger(parsedValue)) {
+      throw new BadRequestException(`Row ${row}: ${field} must be an integer`);
+    }
+
+    return parsedValue;
+  }
+
+  private optionalNumber(value: string | undefined, field: string, row: number) {
+    if (!value || value.trim().length === 0) {
+      return undefined;
+    }
+
+    const parsedValue = Number(value);
+
+    if (!Number.isInteger(parsedValue)) {
+      throw new BadRequestException(`Row ${row}: ${field} must be an integer`);
+    }
+
+    return parsedValue;
+  }
+
+  private optionalDate(value: string | undefined, field: string, row: number) {
+    if (!value || value.trim().length === 0) {
+      return undefined;
+    }
+
+    const parsedDate = new Date(value);
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      throw new BadRequestException(`Row ${row}: ${field} must be a valid date`);
+    }
+
+    return parsedDate;
+  }
+
+  private requireEnum<T extends Record<string, string>>(
+    value: string | undefined,
+    enumObject: T,
+    field: string,
+    row: number,
+  ) {
+    if (!value || value.trim().length === 0) {
+      throw new BadRequestException(`Row ${row}: ${field} is required`);
+    }
+
+    const normalizedValue = value.trim().toUpperCase();
+    const allowedValues = Object.values(enumObject);
+
+    if (!allowedValues.includes(normalizedValue)) {
+      throw new BadRequestException(
+        `Row ${row}: ${field} must be one of: ${allowedValues.join(', ')}`,
+      );
+    }
+
+    return normalizedValue as T[keyof T];
   }
 
   private async findAutoAssignee(projectId: number) {

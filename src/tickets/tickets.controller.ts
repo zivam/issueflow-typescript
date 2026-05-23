@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   Query,
+  Header,
 } from '@nestjs/common';
 import { TicketsService } from './tickets.service';
 import { CreateTicketDto } from './dto/create-ticket.dto';
@@ -24,6 +25,18 @@ export class TicketsController {
   @Get('deleted')
   findDeleted(@Query('projectId') projectId?: string) {
     return this.ticketsService.findDeleted(projectId ? +projectId : undefined);
+  }
+
+  @Get('export')
+  @Header('Content-Type', 'text/csv')
+  @Header('Content-Disposition', 'attachment; filename="tickets.csv"')
+  exportCsv(@Query('projectId') projectId?: string) {
+    return this.ticketsService.exportCsv(projectId ? +projectId : undefined);
+  }
+
+  @Post('import')
+  importCsv(@Body('csvContent') csvContent: string) {
+    return this.ticketsService.importCsv(csvContent);
   }
 
   @Get(':ticketId/dependencies')
