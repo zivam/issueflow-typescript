@@ -114,18 +114,25 @@ export class CommentsService {
     });
   }
 
-  async findMentionsForUser(userId: number) {
+  async findMentionsForUser(
+    userId: number,
+    page: number = 1,
+    pageSize: number = 20,
+  ) {
     await this.usersService.findOne(userId);
 
-    const mentions = await this.commentMentionsRepository.find({
-      where: { userId },
-      order: { id: 'DESC' },
-    });
+    const [mentions, total] =
+      await this.commentMentionsRepository.findAndCount({
+        where: { userId },
+        order: { id: 'DESC' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      });
 
     const commentIds = mentions.map((mention) => mention.commentId);
 
     if (commentIds.length === 0) {
-      return [];
+      return { data: [], total, page };
     }
 
     const comments = await this.commentsRepository.find({
@@ -140,9 +147,11 @@ export class CommentsService {
       .map((commentId) => commentsById.get(commentId))
       .filter((comment): comment is Comment => Boolean(comment));
 
-    return Promise.all(
+    const data = await Promise.all(
       orderedComments.map((comment) => this.attachMentionedUsers(comment)),
     );
+
+    return { data, total, page };
   }
 
   private validateVersion(currentVersion: number, requestVersion?: number) {

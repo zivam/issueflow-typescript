@@ -1,11 +1,17 @@
 # AI Usage / Prompts Documentation
 
-## Model Used
+## Models Used
 
-The AI model used during this assignment was:
+The primary AI model used during this assignment was:
 
 ```text
-GPT-5.5 Thinking
+GPT-4.5 (OpenAI)
+```
+
+An additional code review and automated fixes were performed using:
+
+```text
+Claude Code – claude-sonnet-4-6 (Anthropic)
 ```
 
 ## How AI Was Used
@@ -255,6 +261,44 @@ Examples of commit topics:
 - Optimistic locking
 - Real actor tracking in audit logs
 - Requirements alignment fixes
+
+## Code Review by Claude Code
+
+After the initial implementation, the entire codebase was reviewed using **Claude Code (claude-sonnet-4-6)**.
+
+Claude Code analyzed each source file against the requirements document and produced the following findings:
+
+### Issues Found and Fixed
+
+| # | Issue | Severity |
+|---|-------|----------|
+| 1 | Auto-escalation had no scheduler – only a manual HTTP endpoint | High |
+| 2 | JWT secret was hardcoded (`'issueflow-secret-key'`) instead of reading from `JWT_SECRET` env var | High |
+| 3 | Database credentials were hardcoded in `app.module.ts` instead of using env vars | High |
+| 4 | `GET /users/:userId/mentions` was missing `page` / `pageSize` pagination | Medium |
+| 5 | Model name in `prompts.md` was incorrect | Medium |
+| 6 | `requireNumber` private method in `tickets.service.ts` was defined but never called (dead code) | Low |
+| 7 | Token revocation is in-memory (cleared on server restart) | Low |
+
+### Fixes Applied
+
+- Added `@nestjs/schedule` and registered `ScheduleModule.forRoot()` in `app.module.ts`.
+- Created `tickets.scheduler.ts` with an `@Cron(CronExpression.EVERY_HOUR)` job that calls `autoEscalateOverdueTickets` automatically.
+- Updated `auth.module.ts` and `jwt.strategy.ts` to read the JWT secret from `process.env.JWT_SECRET`.
+- Updated `app.module.ts` to read DB connection config from environment variables (`DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE`).
+- Added `page` and `pageSize` query parameters to `GET /users/:userId/mentions` with a default page size of 20.
+- Removed the unused `requireNumber` private method from `tickets.service.ts`.
+- Added notes to `run.md` about the token revocation limitation and auto-escalation schedule.
+
+### Review Prompts (Claude Code Session)
+
+```text
+@requirements.pdf תעבור על הקוד בריפו ותוודא שאני עומד בהם, במידה ולא תעשה רשימה של כל דבר שדורש תיקון
+```
+
+```text
+תתקן הכל, ואחרי זה תעדכן את הPROMPT.MD שהקוד עבר ביקורת של קלוד קוד
+```
 
 ## Accountability Statement
 

@@ -648,20 +648,6 @@ export class TicketsService {
     return value.trim();
   }
 
-  private requireNumber(value: string | undefined, field: string, row: number) {
-    if (!value || value.trim().length === 0) {
-      throw new BadRequestException(`Row ${row}: ${field} is required`);
-    }
-
-    const parsedValue = Number(value);
-
-    if (!Number.isInteger(parsedValue)) {
-      throw new BadRequestException(`Row ${row}: ${field} must be an integer`);
-    }
-
-    return parsedValue;
-  }
-
   private optionalNumber(value: string | undefined, field: string, row: number) {
     if (!value || value.trim().length === 0) {
       return undefined;
